@@ -1,0 +1,49 @@
+Summary of the lijnen dataframe
+The dataframe has 3243 rows and 8 columns
+The columns are: ['OBJECT_NAAM', 'PARAMETER_NAAM', 'KENMERK_NAAM', 'WAARDE']
+Columns that will be inspected: ['OBJECT_NAAM', 'PARAMETER_NAAM', 'KENMERK_NAAM', 'WAARDE']
+Inspecting column OBJECT_NAAM
+There are 2797 grass
+There are 161 asfaltbetons
+There are 72 bomen of houtopstandens
+There are 52 damwand of beschoeiings
+There are 44 open steenasfalts
+There are 42 steenbestortings
+There are 29 zuilen of blokkens
+There are 15 opsluitbandens
+There are 14 klinkerss
+There are 11 doorgroeistenens
+There are 4 coupuress
+There are 1 afrastering of hekwerks
+There are 1 palens
+Inspecting column PARAMETER_NAAM
+There are 492 graverij kleins
+There are 425 onkruid kleins
+There are 354 scheurens
+There are 320 ruigte of houtopslags
+There are 291 kale plekkens
+There are 283 bedekkingsgraads
+There are 263 spoorvormings
+There are 260 verzakkingen of opbollingens
+There are 126 condities
+There are 98 maaien en beweidings
+There are 96 sterkte graszodes
+There are 62 gatens
+There are 43 afdekkings
+There are 32 vegetaties
+There are 29 onkruid groots
+There are 17 graverij groots
+There are 14 natte plekkens
+There are 11 vlakke aansluitings
+There are 10 doorgroeiings
+There are 6 defects
+There are 6 drijf- of zwerfvuils
+There are 3 soortenrijkdoms
+There are 2 windworps
+Inspecting column KENMERK_NAAM
+There are 3243 Waarderings
+Inspecting column WAARDE
+There are 1308 3_matigs
+There are 1002 4_slechts
+There are 814 2_redelijks
+There are 119 1_goeds

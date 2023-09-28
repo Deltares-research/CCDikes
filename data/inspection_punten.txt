@@ -1,0 +1,71 @@
+Summary of the punten dataframe
+The dataframe has 2731 rows and 6 columns
+The columns are: ['OBJECT_NAAM', 'PARAMETER_NAAM', 'KENMERK_NAAM', 'WAARDE']
+Columns that will be inspected: ['OBJECT_NAAM', 'PARAMETER_NAAM', 'KENMERK_NAAM', 'WAARDE']
+Inspecting column OBJECT_NAAM
+There are 2239 grass
+There are 85 asfaltbetons
+There are 70 coupuress
+There are 57 damwand of beschoeiings
+There are 51 bomen of houtopstandens
+There are 36 klinkerss
+There are 35 opsluitbandens
+There are 32 open steenasfalts
+There are 29 trappens
+There are 28 steenbestortings
+There are 24 zuilen of blokkens
+There are 12 bebordings
+There are 9 palens
+There are 6 doorgroeistenens
+There are 5 drainuitmondings
+There are 4 op- en afrittens
+There are 2 teensloots
+There are 2 afrastering of hekwerks
+There are 1 breuksteen in schanskorvens
+There are 1 oeverbegroeiings
+There are 1 beplanting overigs
+There are 1 lichtmastens
+There are 1 vol en zat gepenetreerde bestortings
+Inspecting column PARAMETER_NAAM
+There are 582 kale plekkens
+There are 510 verzakkingen of opbollingens
+There are 481 graverij kleins
+There are 249 scheurens
+There are 129 spoorvormings
+There are 121 condities
+There are 118 onkruid kleins
+There are 107 ruigte of houtopslags
+There are 96 bedekkingsgraads
+There are 89 defects
+There are 53 gatens
+There are 43 sterkte graszodes
+There are 30 graverij groots
+There are 22 spleets
+There are 18 aansluitings
+There are 15 natte plekkens
+There are 13 onkruid groots
+There are 12 afdekkings
+There are 8 maaien en beweidings
+There are 5 aansluiting grondlichaam (afkalving)s
+There are 4 drijf- of zwerfvuils
+There are 3 losse of gekamde stenens
+There are 3 markerings
+There are 3 verzakkingens
+There are 3 uit loods
+There are 2 windworps
+There are 2 afvoercapaciteits
+There are 2 zanduitspoelings
+There are 2 afleesbaars
+There are 1 conditie wapening (roest, kapot)s
+There are 1 bedekkingsgraad oeverlijns
+There are 1 uitspoelings
+There are 1 erosieafslags
+There are 1 conditie of vitaliteits
+There are 1 vlakke aansluitings
+Inspecting column KENMERK_NAAM
+There are 2731 Waarderings
+Inspecting column WAARDE
+There are 1071 3_matigs
+There are 952 4_slechts
+There are 620 2_redelijks
+There are 88 1_goeds

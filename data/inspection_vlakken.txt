@@ -1,0 +1,20 @@
+Summary of the vlakken dataframe
+The dataframe has 49 rows and 10 columns
+The columns are: ['OBJECT_NAAM', 'PARAMETER_NAAM', 'KENMERK_NAAM', 'WAARDE']
+Columns that will be inspected: ['OBJECT_NAAM', 'PARAMETER_NAAM', 'KENMERK_NAAM', 'WAARDE']
+Inspecting column OBJECT_NAAM
+There are 49 grass
+Inspecting column PARAMETER_NAAM
+There are 27 onkruid kleins
+There are 10 verzakkingen of opbollingens
+There are 5 kale plekkens
+There are 3 onkruid groots
+There are 2 ruigte of houtopslags
+There are 1 bedekkingsgraads
+There are 1 natte plekkens
+Inspecting column KENMERK_NAAM
+There are 49 Waarderings
+Inspecting column WAARDE
+There are 24 4_slechts
+There are 20 3_matigs
+There are 5 2_redelijks
