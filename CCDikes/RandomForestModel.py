@@ -1,22 +1,8 @@
-import pandas as pd
-import geopandas as gpd
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import classification_report, confusion_matrix
-import numpy as np
-from sklearn.tree import export_graphviz
-import chart_studio.plotly as py
-import plotly.graph_objects as go
-import fiona
 import plotly.express as px
-from plotly.offline import init_notebook_mode, iplot
-from IPython.display import IFrame
-from IPython.core.display import display, HTML
 import datetime
 import requests
 import json
-import chart_studio.plotly as py
 from sklearn.metrics import ConfusionMatrixDisplay
 import pandas as pd
 import geopandas as gpd
@@ -109,12 +95,16 @@ def check_meterological_data_per_point(punten, time_section):
 
 
 if __name__ == "__main__":
-    init_notebook_mode(connected=True)
-
-
     # read the geo database
-    path_to_database = "..\Data\Digispectie2017_2022\Digispectie2017_2022.gdb"
-    layers = fiona.listlayers(path_to_database)
+    path_to_database = "..\data\Digispectie2017_2022\Digispectie2017_2022.gdb"
+    layers = ['Inspectie2017_najaar_punt',
+              'Inspectie2018_najaar_punt',
+              'Inspectie2019_najaar_punt',
+              'Inspectie2020_voorjaar_punt',
+              'Inspectie2020_najaar_punt',
+              'Inspectie2021_voorjaar_punt',
+              'Inspectie2021_najaar_punt',
+              'Inspectie2022_voorjaar_punt']
     # %%
     punten = []
     for layer in layers:
