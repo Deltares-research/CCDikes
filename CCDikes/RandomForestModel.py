@@ -134,7 +134,7 @@ def preprocess_and_aggregate_data(database_path, layer_gpkg, add_satellite_data=
                                      dimensions=["OBJECT_NAAM", "PARAMETER_NAAM",  "WAARDE"],
                                      color="inspection_value",
                                      color_continuous_scale=px.colors.sequential.YlGnBu_r)
-    #fig.show()
+    fig.show()
     # keep only "grass" of OBJECT_NAAM
     filtered_gdf = punten[punten["OBJECT_NAAM"] == "gras"]
     # %%
@@ -142,7 +142,7 @@ def preprocess_and_aggregate_data(database_path, layer_gpkg, add_satellite_data=
                                      dimensions=["OBJECT_NAAM", "PARAMETER_NAAM", "WAARDE"],
                                      color="inspection_value",
                                      color_continuous_scale=px.colors.sequential.YlGnBu_r)
-    #fig2.show()
+    fig2.show()
     # %%
     open_existing_file = True
     if open_existing_file:
@@ -195,7 +195,12 @@ def preprocess_and_aggregate_data(database_path, layer_gpkg, add_satellite_data=
     for variable in categorical_variables:
         print(f"{variable}: {filtered_gdf[variable].unique()}")
         # encode the categorical variables
-        filtered_gdf[variable] = filtered_gdf[variable].astype('category').cat.codes
+        encoded = filtered_gdf[variable].astype('category').cat.codes
+        # print the decoded and encoded values
+        for i, value in enumerate(filtered_gdf[variable].unique()):
+            print(f"{value}: {i}")
+        # add the encoded values to the dataframe
+        filtered_gdf[variable] = encoded
     # drop the variables
     filtered_gdf = filtered_gdf.drop(drop_variables, axis=1)
     output_labels = sorted(full_dataset['WAARDE'].unique().tolist())
@@ -247,14 +252,16 @@ def perform_and_evaluate_random_forest(filtered_gdf, output_labels):
     plt.show()
     return rf, X_train, X_test, y_train, y_test
 
-def plot_bbox_last_month(bbox):
-    # create a grid
-    x = np.linspace(bbox[0], bbox[2], 50)
-    y = np.linspace(bbox[1], bbox[3], 50)
-    xx, yy = np.meshgrid(x, y)
+def plot_bbox_last_month(file_name):
+    # read x y csv file
+    x_y = pd.read_csv(file_name)
+    xx = x_y['x'].to_numpy()
+    yy = x_y['y'].to_numpy()
     # collect meteo data of the last 30 days
-    time_section = 365
-    date = datetime.datetime.now()
+    time_section = 60
+    #date = datetime.datetime.now()
+    # 1rst of september 2023
+    date = datetime.datetime(2022, 9, 1)
     # get the max and min dates
     end = date
     start = end - datetime.timedelta(days=time_section)
@@ -262,7 +269,7 @@ def plot_bbox_last_month(bbox):
     results_meteo = KNMI(start=start, end=end, station="350", interval='day', variables=['TG', 'SQ', 'DR', 'RH', 'EV24'])
     mean_meteo = results_meteo.mean()
     # note that the data is the same for each point
-    OBJECT_NAAM = 10 # 10 is the code for grass
+    OBJECT_NAAM = 0 # 0 is the code for grass
     # get aspect and slope data
     points = np.array([xx.flatten(), yy.flatten()]).T
     aspect = sample_points_from_tif(points, "../data/aspect_area.tif")
@@ -290,7 +297,7 @@ def plot_bbox_last_month(bbox):
     # set the crs
     df.crs = "EPSG:4326"
     # read the ndvi data
-    ndvi = gpd.read_file("../data/ndvi.csv")
+    ndvi = gpd.read_file("../data/test_data_ndvi.csv")
     # set the geometry to the points x and y
     ndvi = ndvi.set_geometry(gpd.points_from_xy(ndvi.y, ndvi.x))
     # set the crs
@@ -318,10 +325,16 @@ def plot_bbox_last_month(bbox):
     predictions = np.array(predictions)
     # create a dataframe
     df = pd.DataFrame({'x': df['y'], 'y': df['x'], 'predictions': predictions})
+    # create predictions text according to the legend
+    df['predictions'] = df['predictions'].replace(1, "Goed")
+    df['predictions'] = df['predictions'].replace(2, "Redelijk")
+    df['predictions'] = df['predictions'].replace(3, "Matig")
+    df['predictions'] = df['predictions'].replace(4, "Slecht")
+
     # plot the results in a mapbox plot
     fig = px.scatter_mapbox(df, lat="y", lon="x", color="predictions", zoom=10, color_continuous_scale=px.colors.sequential.Rainbow)
     fig.update_layout(mapbox_style="open-street-map")
-    fig.show()
+    fig.write_html('first_figure_summer.html', auto_open=True)
 
 
 
@@ -345,8 +358,7 @@ if __name__ == "__main__":
     # perform and evaluate the random forest
     rf, X_train, X_test, y_train, y_test = perform_and_evaluate_random_forest(filtered_gdf, output_labels)
     # plot results in a contour plot of the area
-    bbox = [72404.1738, 385300.4088, 135175.194, 415041.17]
-    plot_bbox_last_month(bbox)
+    plot_bbox_last_month("test_cross_sections.csv")
 
 
 
