@@ -53,8 +53,10 @@ def KNMI(start, end, station="348", interval='hour', variables=['RH', 'FF', 'RH'
 
     df = df[['datetime'] + variables]
 
-    df.RH = df.RH.replace(-1, 0)  # Get rid of -1 values
-    df.RH = df.RH / 10000  # Get to SI unit m
+    if "RH" in variables:
+
+        df.RH = df.RH.replace(-1, 0)  # Get rid of -1 values
+        df.RH = df.RH / 10000  # Get to SI unit m
 
     try:
         df.FF = df.FF / 10  # Get to SI unit m/s
@@ -82,16 +84,12 @@ def check_meterological_data_per_point(punten, time_section):
         end = date
         start = end - datetime.timedelta(days=time_section)
         # get the data
-        df = KNMI(start=start, end=end, station="350", interval='day', variables=['TG', 'SQ', 'DR', 'RH', 'EV24'])
+        df = KNMI(start=start, end=end, station="350", interval='day', variables=[ 'EV24'])
         if df is None:
-            meteo_results.append(pd.DataFrame({"TG": 0, "SQ": 0, "DR": 0, "RH": 0, "EV24": 0}))
+            meteo_results.append(pd.DataFrame({ "EV24": 0}))
         # get average values of the dataframe per column
-        meteo_results.append(df[['TG', 'SQ', 'DR', 'RH', 'EV24']].sum(axis=0))
+        meteo_results.append(df[['EV24']].sum(axis=0))
     # add the results to the dataframe
-    punten["TG"] = [result["TG"] for result in meteo_results]
-    punten["SQ"] = [result["SQ"] for result in meteo_results]
-    punten["DR"] = [result["DR"] for result in meteo_results]
-    punten["RH"] = [result["RH"] for result in meteo_results]
     punten["EV24"] = [result["EV24"] for result in meteo_results]
     return punten
 
@@ -111,6 +109,7 @@ def sample_dataframe_from_tif(dataframe, tiff_file):
     values_BAND = [item for sublist in values_BAND for item in sublist]
     return values_BAND
 
+
 def sample_points_from_tif(pts, tiff_file):
     # open the tif file
     r = rasterio.open(tiff_file)
@@ -129,12 +128,21 @@ def preprocess_and_aggregate_data(database_path, layer_gpkg, add_satellite_data=
     punten = gpd.GeoDataFrame(pd.concat(punten, axis=0, sort=False))
     # %%
     punten["inspection_value"] = [int(value.split("_")[0]) for value in punten["WAARDE"].to_list()]
+    # statistics of the data
+    data_list = ['OBJECT_NAAM', 'PARAMETER_NAAM', 'WAARDE', 'inspection_value']
+    for data in data_list:
+        # print the type unique values
+        print(f"Unique values of {data}: {punten[data].unique()}")
+        # plot the data
+        fig = px.histogram(punten, x=data, color="WAARDE",)
+        fig.write_html(f"fig_{data}.html")
+
     # %%
     fig = px.parallel_categories(punten,
                                      dimensions=["OBJECT_NAAM", "PARAMETER_NAAM",  "WAARDE"],
                                      color="inspection_value",
                                      color_continuous_scale=px.colors.sequential.YlGnBu_r)
-    fig.show()
+    fig.write_html("fig_all_data.html")
     # keep only "grass" of OBJECT_NAAM
     filtered_gdf = punten[punten["OBJECT_NAAM"] == "gras"]
     # %%
@@ -142,13 +150,16 @@ def preprocess_and_aggregate_data(database_path, layer_gpkg, add_satellite_data=
                                      dimensions=["OBJECT_NAAM", "PARAMETER_NAAM", "WAARDE"],
                                      color="inspection_value",
                                      color_continuous_scale=px.colors.sequential.YlGnBu_r)
-    fig2.show()
+    fig2.write_html("fig_grass_data.html")
     # %%
     open_existing_file = True
     if open_existing_file:
             # load data geopandas geopackage
             gdf = gpd.read_file("../Data/inspection_points.gpkg", driver="GPKG", layer="inspection_points")
             #filtered_gdf = gdf[gdf["OBJECT_NAAM"] == "gras"]
+            # remove columns
+            remove_columns = ["TG", "SQ", "DR", "RH"]
+            gdf = gdf.drop(columns=remove_columns)
             filtered_gdf = gdf
 
     else:
@@ -189,8 +200,20 @@ def preprocess_and_aggregate_data(database_path, layer_gpkg, add_satellite_data=
         filtered_gdf = filtered_gdf.rename(columns={"x_left": "x", "y_left": "y"})
     full_dataset = filtered_gdf.copy()
     ## encode the categorical variables
-    categorical_variables = ["OBJECT_NAAM",]
-    drop_variables = [ "DATUM", "geometry", "KENMERK_NAAM", "PARAMETER_NAAM", "WAARDE"]
+    categorical_variables = ["OBJECT_NAAM","PARAMETER_NAAM"]
+    drop_variables = [ "DATUM", "geometry", "KENMERK_NAAM", "WAARDE", "x", "y"]
+    # group of remove values in the PARAMETER_NAAM column
+    group_1 = ['onkruid klein','kale plekken','natte plekken','sterkte graszode','onkruid groot','ruigte of houtopslag','bedekkingsgraad','bedekkingsgraad oeverlijn',]
+    group_2 = ['scheuren', 'zanduitspoeling','aansluiting','aansluiting grondlichaam (afkalving)','erosieafslag',]
+    group_3 = ['graverij klein','verzakkingen of opbollingen','graverij groot','spoorvorming','verzakkingen']
+    remove_values = group_1 + group_2 + group_3
+    # remove the values from the PARAMETER_NAAM column that are not in the remove_values list
+    filtered_gdf = filtered_gdf[filtered_gdf["PARAMETER_NAAM"].isin(remove_values)]
+    # group the values in the PARAMETER_NAAM column
+    filtered_gdf.loc[filtered_gdf["PARAMETER_NAAM"].isin(group_1), "PARAMETER_NAAM"] = "group_1"
+    filtered_gdf.loc[filtered_gdf["PARAMETER_NAAM"].isin(group_2), "PARAMETER_NAAM"] = "group_2"
+    filtered_gdf.loc[filtered_gdf["PARAMETER_NAAM"].isin(group_3), "PARAMETER_NAAM"] = "group_3"
+
     # get the unique values of the categorical variables
     for variable in categorical_variables:
         print(f"{variable}: {filtered_gdf[variable].unique()}")
@@ -205,6 +228,7 @@ def preprocess_and_aggregate_data(database_path, layer_gpkg, add_satellite_data=
     filtered_gdf = filtered_gdf.drop(drop_variables, axis=1)
     output_labels = sorted(full_dataset['WAARDE'].unique().tolist())
     return filtered_gdf, output_labels
+
 
 def perform_and_evaluate_random_forest(filtered_gdf, output_labels):
     ## split the data into train and test data
@@ -241,16 +265,20 @@ def perform_and_evaluate_random_forest(filtered_gdf, output_labels):
     feature_importances = sorted(feature_importances, key=lambda x: x[1], reverse=True)
     # Print out the feature and importances
     [print('Variable: {:20} Importance: {}'.format(*pair)) for pair in feature_importances]
-    # plot shap values
 
+    # plot shap values
     explainer = shap.TreeExplainer(rf)
     shap_values = explainer.shap_values(X_test)
+    # rename output labels
+    output_labels = ['Goed', 'Redelijk', 'Matig', 'Slecht']
+
     # clean plots
     plt.show()
     plt.clf()
-    shap.summary_plot(shap_values, X_test, plot_type="bar")
+    shap.summary_plot(shap_values, X_test, plot_type="bar", class_names=output_labels, show=False)
     plt.show()
     return rf, X_train, X_test, y_train, y_test
+
 
 def plot_bbox_last_month(file_name):
     # read x y csv file
@@ -266,7 +294,7 @@ def plot_bbox_last_month(file_name):
     end = date
     start = end - datetime.timedelta(days=time_section)
     # get the data
-    results_meteo = KNMI(start=start, end=end, station="350", interval='day', variables=['TG', 'SQ', 'DR', 'RH', 'EV24'])
+    results_meteo = KNMI(start=start, end=end, station="350", interval='day', variables=[ 'EV24'])
     mean_meteo = results_meteo.mean()
     # note that the data is the same for each point
     OBJECT_NAAM = 0 # 0 is the code for grass
@@ -284,10 +312,6 @@ def plot_bbox_last_month(file_name):
     df = pd.DataFrame({'OBJECT_NAAM': OBJECT_NAAM * np.ones(len(aspect)),
                        'x': points[0],
                        'y': points[1],
-                       'TG': mean_meteo['TG'] * np.ones(len(aspect)),
-                       'SQ': mean_meteo['SQ'] * np.ones(len(aspect)),
-                       'DR': mean_meteo['DR'] * np.ones(len(aspect)),
-                       'RH': mean_meteo['RH'] * np.ones(len(aspect)),
                        'EV24': mean_meteo['EV24'] * np.ones(len(aspect)),
                        'aspect': aspect,
                        'slope': slope,
@@ -297,7 +321,7 @@ def plot_bbox_last_month(file_name):
     # set the crs
     df.crs = "EPSG:4326"
     # read the ndvi data
-    ndvi = gpd.read_file("../data/test_data_ndvi.csv")
+    ndvi = gpd.read_file("../data/merged.csv")
     # set the geometry to the points x and y
     ndvi = ndvi.set_geometry(gpd.points_from_xy(ndvi.y, ndvi.x))
     # set the crs
@@ -321,7 +345,9 @@ def plot_bbox_last_month(file_name):
     df = df[df['aspect'] != -9999]
     df = df[df['slope'] != -9999]
     # get the predictions
-    predictions = rf.predict(df)
+    # remove x and y
+    ds_no_xy = df.drop(['x', 'y'], axis=1)
+    predictions = rf.predict(ds_no_xy)
     predictions = np.array(predictions)
     # create a dataframe
     df = pd.DataFrame({'x': df['y'], 'y': df['x'], 'predictions': predictions})
@@ -330,11 +356,240 @@ def plot_bbox_last_month(file_name):
     df['predictions'] = df['predictions'].replace(2, "Redelijk")
     df['predictions'] = df['predictions'].replace(3, "Matig")
     df['predictions'] = df['predictions'].replace(4, "Slecht")
+    # define the colors for the legend
+    colors = {'Goed': 'green', 'Redelijk': 'yellow', 'Matig': 'orange', 'Slecht': 'red'}
 
     # plot the results in a mapbox plot
-    fig = px.scatter_mapbox(df, lat="y", lon="x", color="predictions", zoom=10, color_continuous_scale=px.colors.sequential.Rainbow)
+    fig = px.scatter_mapbox(df, lat="y", lon="x", color="predictions", color_discrete_map=colors, zoom=12)
     fig.update_layout(mapbox_style="open-street-map")
     fig.write_html('first_figure_summer.html', auto_open=True)
+
+def test_classification_model(model_class, directory):
+    import os
+    import pyproj
+    # get all csv files in the directory that contain the word "dense"
+    csv_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and "dense" in f]
+    # make one big dataframe
+    dfs = []
+    for file in csv_files:
+        dfs.append(pd.read_csv(directory + file))
+    # get the features
+    merged = pd.concat(dfs)
+
+
+    time_section = 60
+    #date = datetime.datetime.now()
+    # 1rst of september 2023
+    date = datetime.datetime(2022, 9, 1)
+    # get the max and min dates
+    end = date
+    start = end - datetime.timedelta(days=time_section)
+    # get the data
+    results_meteo = KNMI(start=start, end=end, station="350", interval='day', variables=[ 'EV24'])
+    mean_meteo = results_meteo.mean()
+    # note that the data is the same for each point
+    OBJECT_NAAM = 0 # 0 is the code for grass
+    # get aspect and slope data
+    points = np.array([merged['x'], merged['y']]).T
+    # transform the points from 4326 to 28992
+    transformer = pyproj.Transformer.from_crs("epsg:4326", "epsg:28992")
+    # transform the points
+    points = transformer.transform(points[:, 1], points[:, 0])
+    points = np.array(points).T
+    aspect = sample_points_from_tif(points, "../data/aspect_area.tif")
+    slope = sample_points_from_tif(points, "../data/slope_area.tif")
+    # 28992 to 4326
+
+    transformer = pyproj.Transformer.from_crs("epsg:28992", "epsg:4326")
+    # transform the points
+    points = transformer.transform(points[:, 0], points[:, 1])
+
+    # create a dataframe as the one used for the model
+    df = pd.DataFrame({'OBJECT_NAAM': OBJECT_NAAM * np.ones(len(aspect)),
+                       'x': points[0],
+                       'y': points[1],
+                       'EV24': mean_meteo['EV24'] * np.ones(len(aspect)),
+                       'aspect': aspect,
+                       'slope': slope,
+                       })
+    # remove the points with no aspect or slope data
+    df = df[df['aspect'] != -9999]
+    df = df[df['slope'] != -9999]
+    # keep points
+    keep_points = df[['x', 'y']]
+    # to geo dataframe
+    df = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y))
+    # set the crs
+    df.crs = "EPSG:4326"
+    # read the ndvi data
+    ndvi = merged
+    # set the geometry to the points x and y
+    ndvi = ndvi.set_geometry(gpd.points_from_xy(ndvi.y, ndvi.x))
+    # set the crs
+    ndvi.crs = "EPSG:4326"
+    # join the dataframes
+    df = gpd.sjoin_nearest(df, ndvi, how="left")
+    # columns to keep
+    keep_columns = [
+        'EV24',
+        'aspect',
+        'slope',
+        'ndvi',
+
+    ]
+    df = df[keep_columns]
+
+
+    # pass the dataframe to the model
+    prediction = model_class.predict(df)
+    # get the predictions probabilities
+    prediction_probabilities = model_class.predict_proba(df)
+    # add x and y to the dataframe
+    df['x'] = keep_points['x']
+    df['y'] = keep_points['y']
+    # decode the predictions
+    group = {0: "Graverij", 1: "Gras", 2: "Scheren"}
+    prediction = [group[prediction[i]] for i in range(len(prediction))]
+    # add the predictions to the dataframe
+    df['Groep'] = prediction
+    # plot the results in a mapbox plot
+    fig = px.scatter_mapbox(df, lat="x", lon="y", color='Groep', zoom=12)
+    fig.update_layout(mapbox_style="open-street-map")
+    fig.show()
+    # plot the probabilities in a mapbox plot with three traces
+    fig = px.scatter_mapbox(df, lat="x", lon="y", color=prediction_probabilities[:, 0], zoom=12)
+    # add title
+    fig.update_layout(title_text="Graverij potentieel")
+    fig.update_layout(mapbox_style="open-street-map")
+    fig.show()
+    fig = px.scatter_mapbox(df, lat="x", lon="y", color=prediction_probabilities[:, 1], zoom=12)
+    # add title
+    fig.update_layout(title_text="Gras potentieel")
+    fig.update_layout(mapbox_style="open-street-map")
+    fig.show()
+    fig = px.scatter_mapbox(df, lat="x", lon="y", color=prediction_probabilities[:, 2], zoom=12)
+    # add title
+    fig.update_layout(title_text="Scheren potentieel")
+    fig.update_layout(mapbox_style="open-street-map")
+    fig.show()
+
+
+def accuracy_score(y_true, y_pred):
+    from sklearn.metrics import accuracy_score
+    return accuracy_score(y_true, y_pred)
+
+def plot_confusion_matrix(y_true, y_pred, features):
+    from sklearn.metrics import confusion_matrix
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    # get the confusion matrix in percentages
+    cm = confusion_matrix(y_true, y_pred, normalize='true')
+    # plot the confusion matrix
+    plt.figure(figsize=(10, 7))
+    # change the labels
+    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues')
+    # change the labels in ticks in the middle of the squares
+    loc = np.arange(len(features)) + 0.5
+    plt.xticks( loc, features)
+    plt.yticks(loc, features)
+    plt.title("Confusion matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.show()
+
+def perform_and_evaluate_xboost(df, labels):
+    import xgboost as xgb
+    outputs = "inspection_value"
+    # split the data
+    X_train, X_test, y_train, y_test = train_test_split(df.drop(outputs, axis=1), df[outputs], test_size=0.2, random_state=42)
+    # create the xgboost model
+    model = xgb.XGBClassifier(objective="multi:softprob", random_state=42)
+    # fit the model
+    model.fit(X_train.to_numpy(), y_train.to_numpy() - 1)
+    # get the predictions
+    predictions = model.predict(X_test.to_numpy())
+    # get the accuracy
+    accuracy = accuracy_score(y_test - 1, predictions)
+    print("Accuracy of the model is {}".format(accuracy))
+    # get the feature importance
+    feature_importance = model.feature_importances_
+    # get the feature names
+    feature_names = df.drop(outputs, axis=1).columns.tolist()
+    # create a dataframe
+    df_feature_importance = pd.DataFrame({'feature_names': feature_names, 'feature_importance': feature_importance})
+    # sort the dataframe
+    df_feature_importance = df_feature_importance.sort_values(by=['feature_importance'], ascending=False)
+    # plot the feature importance
+    fig = px.bar(df_feature_importance, x='feature_names', y='feature_importance')
+    fig.show()
+    # plot the confusion matrix
+    plot_confusion_matrix( y_test, predictions, feature_names)
+    plt.show()
+
+
+def perform_information_gain_analysis(df, label):
+    from sklearn.feature_selection import mutual_info_classif
+    # get the information gain
+    information_gain = mutual_info_classif(df.drop([label], axis=1).to_numpy(), df[label].to_numpy() - 1)
+    # create a dataframe
+    df_information_gain = pd.DataFrame({'feature_names': df.drop([label], axis=1).columns.tolist(), 'information_gain': information_gain})
+    # sort the dataframe
+    df_information_gain = df_information_gain.sort_values(by=['information_gain'], ascending=False)
+    # plot the information gain
+    fig, ax = plt.subplots(figsize=(10, 7))
+    ax.bar(df_information_gain['feature_names'], df_information_gain['information_gain'])
+    ax.set_xticklabels(df_information_gain['feature_names'], rotation=90)
+    ax.set_title("Information gain")
+    plt.savefig("information_gain.png")
+    # also do simple correlation analysis for the label
+    df_corr = df.corr()
+    df_corr = df_corr.sort_values(by=[label], ascending=False)
+    # plot the correlation do not plot the label itself
+    fig, ax = plt.subplots(figsize=(10, 7))
+    ax.bar(df_corr.index, df_corr[label])
+    ax.set_xticklabels(df_corr.index, rotation=45)
+    # set the y axis
+    ax.set_ylim([-1.2, 1.2])
+    # set labels
+    ax.set_ylabel("Correlation coefficient")
+    ax.set_title("Correlation")
+    plt.savefig("correlation.png")
+
+def classification_with_tensorflow(df, output):
+    from ngboost import NGBClassifier
+    from ngboost.distns import k_categorical, Bernoulli
+    # split the data
+    X_train, X_test, y_train, y_test = train_test_split(df.drop([output, 'inspection_value'] + ['OBJECT_NAAM'], axis=1), df[output], test_size=0.2, random_state=42)
+    # create the model
+    n_of_output_classes = len(df[output].unique())
+    ngb_cat = NGBClassifier(Dist=k_categorical(n_of_output_classes),
+                            verbose=True,
+                            random_state=42,
+                            n_estimators=10000,
+                            learning_rate=0.05,
+                            minibatch_frac=0.5,
+                            col_sample=0.5,)
+    # fit the model
+    ngb_cat.fit(X_train.to_numpy(), y_train.to_numpy())
+    # plot the confusion matrix
+    predictions_det = ngb_cat.predict(X_test.to_numpy())
+    plot_confusion_matrix(y_test, predictions_det, ['graverij', 'gras', 'scheuren'])
+    plt.show()
+    predictions_prob = ngb_cat.predict_proba(X_test.to_numpy())
+    # plot the probabilities
+    fig, ax = plt.subplots(figsize=(10, 7))
+    ax.hist(predictions_prob[:, 0], bins=50, alpha=0.5, label='graverij')
+    ax.hist(predictions_prob[:, 1], bins=50, alpha=0.5, label='gras')
+    ax.hist(predictions_prob[:, 2], bins=50, alpha=0.5, label='scheuren')
+    ax.set_xlabel("Probability")
+    ax.set_ylabel("Count")
+    ax.set_title("Probability distribution")
+    ax.legend()
+    plt.show()
+    return ngb_cat
+
+
+
 
 
 
@@ -355,10 +610,28 @@ if __name__ == "__main__":
                                                                 layers,
                                                                 add_satellite_data=add_satellite_data,
                                                                 time_section=30)
+
+
+    classify_model = classification_with_tensorflow(filtered_gdf, "PARAMETER_NAAM")
+    # drop the columns that are not needed
+    filtered_gdf = filtered_gdf.drop(['PARAMETER_NAAM'], axis=1)
+    test_classification_model(classify_model, "D:/CCDikes/data/")
+    # check correlations between the features
+    perform_information_gain_analysis(filtered_gdf, "OBJECT_NAAM")
     # perform and evaluate the random forest
     rf, X_train, X_test, y_train, y_test = perform_and_evaluate_random_forest(filtered_gdf, output_labels)
+    # merge all csv files
+
+    # find all csv files in the folder
+    import os
+    folder = "D:\CCDikes\data"
+    csv_files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".csv") and "dense" in f]
+    # merge all csv files
+    df = pd.concat([pd.read_csv(f) for f in csv_files])
+    # write the merged csv file
+    df.to_csv(folder + "\merged.csv", index=False)
     # plot results in a contour plot of the area
-    plot_bbox_last_month("test_cross_sections.csv")
+    plot_bbox_last_month(folder + "\merged.csv")
 
 
 

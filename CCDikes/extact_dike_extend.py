@@ -8,25 +8,7 @@ import math
 from shapely.ops import substring
 
 
-def get_perpendicular_cross_section_to_trajectory(dijkvak_traj_sub: LineString, length_cross_section: float) -> LineString:
-    """
-    Return a perpendicular cross-section to the trajectory at the specified distance from the start of the trajectory.
 
-    :param dijkvak_traj_sub: trajectory
-    :param length_cross_section: length of the cross-section in meters
-
-    :return: LineString
-    """
-
-    left = dijkvak_traj_sub.parallel_offset(length_cross_section / 2, 'left')
-    right = dijkvak_traj_sub.parallel_offset(length_cross_section / 2, 'right')
-    try:
-        c = left.boundary.geoms[1]
-        d = right.boundary.geoms[1]
-    except IndexError:
-        print('IndexError')
-    cross_section_ls = LineString([c, d])
-    return cross_section_ls
 
 
 def plot_cross_sections_on_mapbox(point_list, epsg_in=28992, epsg_out=4326):
@@ -81,6 +63,27 @@ def plot_cross_sections_on_mapbox(point_list, epsg_in=28992, epsg_out=4326):
     return fig
 
 
+def get_perpendicular_cross_section_to_trajectory(dijkvak_traj_sub: LineString, length_cross_section: float) -> LineString:
+    """
+    Return a perpendicular cross-section to the trajectory at the specified distance from the start of the trajectory.
+
+    :param dijkvak_traj_sub: trajectory
+    :param length_cross_section: length of the cross-section in meters
+
+    :return: LineString
+    """
+
+    left = dijkvak_traj_sub.parallel_offset(length_cross_section / 2, 'left')
+    right = dijkvak_traj_sub.parallel_offset(length_cross_section / 2, 'right')
+    try:
+        c = left.boundary.geoms[1]
+        d = right.boundary.geoms[0]
+    except IndexError:
+        print('IndexError')
+    cross_section_ls = LineString([c, d])
+    return cross_section_ls
+
+
 def get_cross_section_char_points(trajectory, distance_from_start: float, length_cross_section: float) -> list:
         """
         Return a list of xy coordinates of the  three characteristic representing a cross-section: the left point, the
@@ -115,8 +118,10 @@ def extract_cross_sections(trajectory, n, y):
     cross_sections = []
 
     for linestring in trajectory.geoms:
+        # plot the trajectory
         total_distance = 0
-        distances = np.linspace(0, linestring.length, n)
+        # every n meters, generate a cross section
+        distances = np.arange(0, linestring.length, n)
         distances = distances[1:-1]
         for distance in distances:
             # Generate points along the cross section
@@ -125,6 +130,7 @@ def extract_cross_sections(trajectory, n, y):
             # populate between the points with equidistant points
             cross_section_points += list(getEquidistantPoints(extreme_points[0], extreme_points[1], 10))
             cross_section_points += list(getEquidistantPoints(extreme_points[1], extreme_points[2], 10))
+            # plot the cross section
             total_distance -= n
             cross_sections.append(cross_section_points)
     return cross_sections
@@ -185,7 +191,7 @@ cross_sections = []
 for index, row in data.iterrows():
     polygon_1 = row['geometry']
     if polygon_1.intersects(wkt_poly):
-        cross_section = extract_cross_sections(polygon_1, 10, 20)
+        cross_section = extract_cross_sections(polygon_1, 1500, 3)
         cross_sections += cross_section
 # flatten the list to points and create dataframe
 cross_sections = [item for sublist in cross_sections for item in sublist]
