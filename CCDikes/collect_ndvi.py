@@ -43,11 +43,11 @@ def get_ndvi_on_date_bbox(bbox, date, inspection_points):
             items,
             epsg=4326,  # if you want to cast the data to a common crs
             assets=list(BAND.keys()),
-            bounds_latlon=bbox.tolist(),
+            bounds_latlon=bbox,
             sortby_date="desc",  # maybe you want to sort the data by date?
         )
         # calculate the median
-        median = data.median(dim="time").compute()
+        median = data.median(dim="time")
         #median = data.chunk({'time': -1}).quantile(q=0.8, dim="time").compute()
         # calculate the Normalised difference moisture index
         red = median.sel({"band": "B04"})
@@ -57,7 +57,10 @@ def get_ndvi_on_date_bbox(bbox, date, inspection_points):
         # sample the data at the inspection points
         x = xr.DataArray(list(inspection_points[0, :]), dims='z')
         y = xr.DataArray(list(inspection_points[1, :]), dims='z')
-        time_ndvi = ndvi.sel(x=x, y=y, method='nearest').to_dataframe(name="ndvi").reset_index()
+        time_ndvi = ndvi.sel(x=x, y=y, method='nearest')
+        time_ndvi = time_ndvi.to_dataframe(name="ndvi")
+        time_ndvi["x"] = inspection_points[0, :]
+        time_ndvi["y"] = inspection_points[1, :]
         return time_ndvi
     else:
         return None
@@ -72,12 +75,22 @@ if __name__ == "__main__":
     points.crs = "EPSG:28992"
     # # transform to latlon
     points = points.to_crs("EPSG:4326")
-    bbox = points.total_bounds
     # 1rst of september 2023
     date_now = datetime.datetime(2022, 9, 1)
     inspection_points = np.array([points.geometry.x.to_numpy(), points.geometry.y.to_numpy()])
-    ndvi = get_ndvi_on_date_bbox(bbox, date_now, inspection_points)
-    ndvi.to_csv("../data/test_data_ndvi_summer.csv")
+    # calculate the bbox
+    bbox = [np.min(inspection_points[0, :]), np.min(inspection_points[1, :]), np.max(inspection_points[0, :]), np.max(inspection_points[1, :])]
+    # loop over 1000 points
+    points_num = 10
+    for i in range(0, len(inspection_points[0, :]), points_num):
+        try:
+            print(f"Processing points {i} to {i+points_num} out of {len(inspection_points[0, :])}")
+            ndvi = get_ndvi_on_date_bbox(bbox, date_now, inspection_points[:, i:i+points_num])
+            if ndvi is not None:
+                ndvi.to_csv(f"../data/test_data_ndvi_summer_dense_{i}.csv")
+        except Exception as e:
+            print(e)
+
     # path_to_database = "..\data\Digispectie2017_2022\Digispectie2017_2022.gdb"
     # layers = ['Inspectie2017_najaar_punt',
     #           'Inspectie2018_najaar_punt',
