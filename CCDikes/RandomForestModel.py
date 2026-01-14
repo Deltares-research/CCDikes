@@ -252,6 +252,8 @@ def perform_and_evaluate_random_forest(filtered_gdf, output_labels):
     #plt.show()
     # %%
     ConfusionMatrixDisplay.from_predictions(y_test, predictions, display_labels=output_labels, cmap=plt.cm.Blues, normalize='true')
+    # save the plot in high resolution
+    plt.savefig("confusion_matrix.svg", dpi=1200, format='svg')
     #plt.show()
     accuracy = rf.score(X_test, y_test)
     print(f"Accuracy: {accuracy * 100.0}%")
@@ -275,12 +277,16 @@ def perform_and_evaluate_random_forest(filtered_gdf, output_labels):
     # clean plots
     plt.show()
     plt.clf()
-    shap.summary_plot(shap_values, X_test, plot_type="bar", class_names=output_labels, show=False)
-    plt.show()
+    # plot but simple bar plot with shap values and square format
+    shap.summary_plot(shap_values, X_test, plot_type="bar", class_names=output_labels, show=False, plot_size=(10, 10))
+    # change font size
+    plt.rcParams.update({'font.size': 44})
+    # save the plot in high resolution
+    plt.savefig("shap_values.svg", dpi=1200, format='svg')
     return rf, X_train, X_test, y_train, y_test
 
 
-def plot_bbox_last_month(file_name):
+def plot_bbox_last_month(file_name, rf):
     # read x y csv file
     x_y = pd.read_csv(file_name)
     xx = x_y['x'].to_numpy()
@@ -289,7 +295,7 @@ def plot_bbox_last_month(file_name):
     time_section = 60
     #date = datetime.datetime.now()
     # 1rst of september 2023
-    date = datetime.datetime(2022, 9, 1)
+    date = datetime.datetime(2022, 6, 1)
     # get the max and min dates
     end = date
     start = end - datetime.timedelta(days=time_section)
@@ -300,18 +306,19 @@ def plot_bbox_last_month(file_name):
     OBJECT_NAAM = 0 # 0 is the code for grass
     # get aspect and slope data
     points = np.array([xx.flatten(), yy.flatten()]).T
-    aspect = sample_points_from_tif(points, "../data/aspect_area.tif")
-    slope = sample_points_from_tif(points, "../data/slope_area.tif")
-    # 28992 to 4326
+    # points to 28992
     import pyproj
-    transformer = pyproj.Transformer.from_crs("epsg:28992", "epsg:4326")
-    # transform the points
-    points = transformer.transform(points[:, 0], points[:, 1])
+    transformer = pyproj.Transformer.from_crs("epsg:4326", "epsg:28992")
+    new_points = transformer.transform(points[:, 1], points[:, 0])
+    new_points = np.array(new_points).T
+    aspect = sample_points_from_tif(new_points, "../data/aspect_area.tif")
+    slope = sample_points_from_tif(new_points, "../data/slope_area.tif")
+    # 28992 to 4326
 
     # create a dataframe as the one used for the model
     df = pd.DataFrame({'OBJECT_NAAM': OBJECT_NAAM * np.ones(len(aspect)),
-                       'x': points[0],
-                       'y': points[1],
+                       'x': points[:, 1],
+                       'y': points[:, 0],
                        'EV24': mean_meteo['EV24'] * np.ones(len(aspect)),
                        'aspect': aspect,
                        'slope': slope,
@@ -321,7 +328,7 @@ def plot_bbox_last_month(file_name):
     # set the crs
     df.crs = "EPSG:4326"
     # read the ndvi data
-    ndvi = gpd.read_file("../data/merged.csv")
+    ndvi = gpd.read_file("../data/test_data_ndvi_summer.csv")
     # set the geometry to the points x and y
     ndvi = ndvi.set_geometry(gpd.points_from_xy(ndvi.y, ndvi.x))
     # set the crs
@@ -363,6 +370,15 @@ def plot_bbox_last_month(file_name):
     fig = px.scatter_mapbox(df, lat="y", lon="x", color="predictions", color_discrete_map=colors, zoom=12)
     fig.update_layout(mapbox_style="open-street-map")
     fig.write_html('first_figure_summer.html', auto_open=True)
+    # to shapefile
+    df = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y))
+    df['predictions'] = df['predictions'].replace("Goed", 1)
+    df['predictions'] = df['predictions'].replace("Redelijk", 2)
+    df['predictions'] = df['predictions'].replace("Matig", 3)
+    df['predictions'] = df['predictions'].replace("Slecht", 4)
+    df.crs = "EPSG:4326"
+    df.to_file("predictions_summer.shp")
+
 
 def test_classification_model(model_class, directory):
     import os
@@ -612,12 +628,12 @@ if __name__ == "__main__":
                                                                 time_section=30)
 
 
-    classify_model = classification_with_tensorflow(filtered_gdf, "PARAMETER_NAAM")
+    #classify_model = classification_with_tensorflow(filtered_gdf, "PARAMETER_NAAM")
     # drop the columns that are not needed
     filtered_gdf = filtered_gdf.drop(['PARAMETER_NAAM'], axis=1)
-    test_classification_model(classify_model, "D:/CCDikes/data/")
+    #test_classification_model(classify_model, "D:/CCDikes/data/")
     # check correlations between the features
-    perform_information_gain_analysis(filtered_gdf, "OBJECT_NAAM")
+    #perform_information_gain_analysis(filtered_gdf, "OBJECT_NAAM")
     # perform and evaluate the random forest
     rf, X_train, X_test, y_train, y_test = perform_and_evaluate_random_forest(filtered_gdf, output_labels)
     # merge all csv files
@@ -625,13 +641,13 @@ if __name__ == "__main__":
     # find all csv files in the folder
     import os
     folder = "D:\CCDikes\data"
-    csv_files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".csv") and "dense" in f]
+    #csv_files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".csv") and "dense" in f]
     # merge all csv files
-    df = pd.concat([pd.read_csv(f) for f in csv_files])
+    #df = pd.concat([pd.read_csv(f) for f in csv_files])
     # write the merged csv file
-    df.to_csv(folder + "\merged.csv", index=False)
+    #df.to_csv(folder + "\merged.csv", index=False)
     # plot results in a contour plot of the area
-    plot_bbox_last_month(folder + "\merged.csv")
+    plot_bbox_last_month(folder + "/test_data_ndvi_summer.csv", rf)
 
 
 
